@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ASL Web App</title>
+</head>
+<body>
+    <h1>ASL Recognition</h1>
+    <video id="video" autoplay></video>
+    <p id="sentence"></p>
+    <audio id="audio" autoplay></audio>
+
+<script>
+const video = document.getElementById("video");
+const sentenceText = document.getElementById("sentence");
+const audio = document.getElementById("audio");
+
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => video.srcObject = stream);
+
+let isProcessing = false;
+
+async function sendFrame() {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg"));
+
+    const formData = new FormData();
+    formData.append("frame", blob);
+
+    try {
+        const res = await fetch("http://localhost:8000/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await res.json();
+
+        console.log(data); // DEBUG
+
+        sentenceText.innerText = data.sentence || "";
+
+        if (data.word && data.word !== "") {
+            audio.src = `http://localhost:8000/tts?sentence=${encodeURIComponent(data.word)}`;
+        }
+
+    } catch (err) {
+        console.error(err);
+    }
+
+    isProcessing = false;
+}
+
+setInterval(sendFrame, 100);
+</script>
+</body>
+</html>
