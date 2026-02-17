@@ -1,0 +1,463 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASL Recognition</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --ok: #16a34a;
+      --warn: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Inter", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #f8faff 0%, #f3f6fb 100%);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 28px 16px;
+    }
+
+    .app {
+      width: min(920px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+      padding: clamp(18px, 3vw, 30px);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 4px 0 18px;
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      letter-spacing: 0.01em;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: min(760px, 92%);
+      aspect-ratio: 4 / 3;
+      margin: 0 auto;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #d9e1ef;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.12), transparent 35%),
+        radial-gradient(circle at 85% 70%, rgba(2, 132, 199, 0.12), transparent 35%),
+        #e9eef7;
+    }
+
+    .camera-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #0f172a;
+      transform: scaleX(-1);
+    }
+
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #334155;
+      font-size: clamp(0.9rem, 2vw, 1.05rem);
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px dashed #b8c4da;
+      margin: 14px;
+      border-radius: 12px;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.25s ease;
+    }
+
+    .camera-overlay.hidden {
+      opacity: 0;
+    }
+
+    .live-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(15, 23, 42, 0.78);
+      color: #fff;
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      z-index: 2;
+    }
+
+    .guide-text {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #dbe3f2;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #334155;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .status-row {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #0f766e;
+      font-weight: 600;
+      font-size: 0.96rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.15);
+    }
+
+    .status-row.error {
+      color: #991b1b;
+    }
+
+    .status-row.error .status-dot {
+      background: var(--warn);
+      box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.15);
+    }
+
+    .output {
+      margin-top: 24px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: clamp(16px, 2.4vw, 22px);
+    }
+
+    .output-label {
+      margin: 0;
+      font-size: 0.87rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .recognized-word {
+      margin: 10px 0 6px;
+      font-size: clamp(2rem, 6vw, 3.6rem);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .confidence {
+      margin: 0;
+      color: #334155;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .icon-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid #d5deed;
+      background: #fff;
+      color: #1e293b;
+      font-size: 1.35rem;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .icon-btn:hover {
+      transform: translateY(-1px);
+      border-color: #bfd0ee;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+    }
+
+    .icon-btn:focus-visible {
+      outline: 3px solid var(--accent-soft);
+      outline-offset: 2px;
+    }
+
+    footer {
+      margin-top: 18px;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    @media (max-width: 580px) {
+      .guide-text {
+        max-width: calc(100% - 20px);
+        white-space: normal;
+        border-radius: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>ASL Recognition</h1>
+
+    <section class="camera-frame" aria-label="Camera feed area">
+      <span class="live-badge">● LIVE</span>
+      <video id="camera" class="camera-video" autoplay playsinline muted></video>
+      <div id="cameraOverlay" class="camera-overlay">Starting camera...</div>
+      <span id="guideText" class="guide-text">Place hands inside the frame</span>
+    </section>
+
+    <div id="statusRow" class="status-row" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="statusText">Idle</span>
+    </div>
+
+    <section class="output" aria-label="Recognized output">
+      <p class="output-label">Recognized Output</p>
+      <p id="recognizedWord" class="recognized-word">--</p>
+      <p id="confidenceText" class="confidence">Confidence: --</p>
+    </section>
+
+    <div class="controls" aria-label="Controls">
+      <button id="clearBtn" class="icon-btn" type="button" aria-label="Clear">⟳</button>
+      <button id="speakBtn" class="icon-btn" type="button" aria-label="Speak">🔊</button>
+    </div>
+
+    <footer>Real-Time ASL Recognition • Computer Vision • v1.0</footer>
+  </main>
+
+  <script>
+    const BACKEND_BASE_URL = "http://localhost:8000";
+    const PREDICT_INTERVAL_MS = 180;
+
+    const video = document.getElementById("camera");
+    const cameraOverlay = document.getElementById("cameraOverlay");
+    const guideText = document.getElementById("guideText");
+    const statusRow = document.getElementById("statusRow");
+    const statusText = document.getElementById("statusText");
+    const recognizedWord = document.getElementById("recognizedWord");
+    const confidenceText = document.getElementById("confidenceText");
+    const clearBtn = document.getElementById("clearBtn");
+    const speakBtn = document.getElementById("speakBtn");
+
+    let currentSentence = "";
+    let isPredicting = false;
+    let predictTimerId = null;
+    let frameCanvas = null;
+    let frameCtx = null;
+    let ttsObjectUrl = null;
+
+    function setStatus(text, isError = false) {
+      statusText.textContent = text;
+      statusRow.classList.toggle("error", isError);
+    }
+
+    function setOutput(word, confidenceTextValue = "--") {
+      recognizedWord.textContent = word || "--";
+      confidenceText.textContent = `Confidence: ${confidenceTextValue}`;
+    }
+
+    function ensureCanvas() {
+      if (!frameCanvas) {
+        frameCanvas = document.createElement("canvas");
+        frameCtx = frameCanvas.getContext("2d", { alpha: false });
+      }
+    }
+
+    function captureFrameBlob() {
+      ensureCanvas();
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height || !frameCtx) return Promise.resolve(null);
+
+      frameCanvas.width = width;
+      frameCanvas.height = height;
+      frameCtx.drawImage(video, 0, 0, width, height);
+
+      return new Promise((resolve) => {
+        frameCanvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
+      });
+    }
+
+    function getConfidenceDisplay(data) {
+      if (typeof data.confidence === "number") {
+        return `${Math.round(data.confidence * 100)}%`;
+      }
+      if (typeof data.confidence_percent === "number") {
+        return `${Math.round(data.confidence_percent)}%`;
+      }
+      return "--";
+    }
+
+    async function sendFrameForPrediction() {
+      if (isPredicting || video.readyState < 2) return;
+      isPredicting = true;
+
+      try {
+        const frameBlob = await captureFrameBlob();
+        if (!frameBlob) return;
+
+        const formData = new FormData();
+        formData.append("frame", frameBlob, "frame.jpg");
+
+        const response = await fetch(`${BACKEND_BASE_URL}/predict`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Predict failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const word = (data.word || "").trim();
+        const sentence = (data.sentence || "").trim();
+        const confidence = getConfidenceDisplay(data);
+
+        if (sentence) {
+          currentSentence = sentence;
+          guideText.textContent = `Sentence: ${sentence}`;
+        } else {
+          guideText.textContent = "Place hands inside the frame";
+        }
+
+        if (word) {
+          setOutput(word.toUpperCase(), confidence);
+          setStatus("Recognizing", false);
+        } else {
+          setStatus("Idle", false);
+        }
+      } catch (_error) {
+        setStatus("Backend offline", true);
+      } finally {
+        isPredicting = false;
+      }
+    }
+
+    async function speakFromBackend() {
+      const text = currentSentence || recognizedWord.textContent.trim();
+      if (!text || text === "--") return;
+
+      try {
+        const response = await fetch(
+          `${BACKEND_BASE_URL}/tts?sentence=${encodeURIComponent(text)}`
+        );
+        if (!response.ok) {
+          throw new Error(`TTS failed: ${response.status}`);
+        }
+
+        const audioBlob = await response.blob();
+        if (ttsObjectUrl) URL.revokeObjectURL(ttsObjectUrl);
+        ttsObjectUrl = URL.createObjectURL(audioBlob);
+
+        const audio = new Audio(ttsObjectUrl);
+        await audio.play();
+      } catch (_error) {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        }
+      }
+    }
+
+    function startPredictionLoop() {
+      if (predictTimerId) clearInterval(predictTimerId);
+      predictTimerId = setInterval(sendFrameForPrediction, PREDICT_INTERVAL_MS);
+    }
+
+    async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus("Camera not supported", true);
+        cameraOverlay.textContent = "Camera API not supported in this browser";
+        guideText.textContent = "Use latest Chrome/Edge and open via localhost";
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        cameraOverlay.classList.add("hidden");
+        setStatus("Camera ready", false);
+        startPredictionLoop();
+        sendFrameForPrediction();
+      } catch (_error) {
+        setStatus("Camera blocked", true);
+        cameraOverlay.textContent = "Camera access denied or unavailable";
+        guideText.textContent = "Allow camera permission, then reload the page";
+      }
+    }
+
+    clearBtn.addEventListener("click", () => {
+      currentSentence = "";
+      setOutput("--", "--");
+      guideText.textContent = "Place hands inside the frame";
+      setStatus("Idle", false);
+    });
+
+    speakBtn.addEventListener("click", () => {
+      speakFromBackend();
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (predictTimerId) clearInterval(predictTimerId);
+
+      const stream = video.srcObject;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+
+      if (ttsObjectUrl) URL.revokeObjectURL(ttsObjectUrl);
+    });
+
+    startCamera();
+  </script>
+</body>
+</html>
