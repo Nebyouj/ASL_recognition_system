@@ -40,7 +40,7 @@ async def predict(frame: UploadFile = File(...)):
     word = recognizer.process_frame(frame)
 
     return {
-        "word": word,
+        "word": word, 
         "sentence": " ".join(recognizer.sentence)
     }
 
