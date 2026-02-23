@@ -420,18 +420,26 @@ detector = vision.HandLandmarker.create_from_options(options)
 # ==============================
 def extract_two_hand_features(result):
     features = []
+
     for hand_idx in range(2):
         if hand_idx < len(result.hand_landmarks):
             lm = result.hand_landmarks[hand_idx]
+
             if NORMALIZE_LANDMARKS:
                 wrist_x, wrist_y = lm[0].x, lm[0].y
-                features.extend([(p.x - wrist_x, p.y - wrist_y) for p in lm])
+                for p in lm:
+                    features.append(p.x - wrist_x)
+                    features.append(p.y - wrist_y)
             else:
-                features.extend([(p.x, p.y) for p in lm])
-            features = [coord for pair in features for coord in pair]
+                for p in lm:
+                    features.append(p.x)
+                    features.append(p.y)
         else:
+            # 21 landmarks × (x,y) = 42 values
             features.extend([0.0] * 42)
+
     return np.array(features, dtype=np.float32)
+
 
 def save_sequence(path, data):
     np.save(path, data)
@@ -445,7 +453,7 @@ class ASLRecorder:
         self.root.title("ASL Dataset Recorder")
         self.current_label = None
         self.seq_idx = 0
-        self.sample_count = 0
+        self.sample_count = 50
         self.frame_count = 0
         self.sequence = np.zeros((SEQUENCE_LENGTH, 84), dtype=np.float32)
         self.recording = False
@@ -480,7 +488,7 @@ class ASLRecorder:
         self.status_label.config(text=f"Recording: {gesture}", fg="blue")
 
     def clear_samples(self):
-        self.sample_count = 0
+        self.sample_count = 50
         self.seq_idx = 0
         self.sequence.fill(0)
         self.status_label.config(text="Samples cleared", fg="orange")

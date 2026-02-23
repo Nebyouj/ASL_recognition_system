@@ -90,8 +90,6 @@
 
 
 
-
-
 import time
 import cv2 as cv
 import numpy as np
@@ -105,7 +103,7 @@ from mediapipe.tasks.python import vision
 
 SEQUENCE_LENGTH = 30
 SMOOTH_WINDOW = 10      # smoothing predictions over last 10
-CONF_THRESHOLD = 0.7    # minimum softmax probability to show word
+CONF_THRESHOLD = 0.25   # minimum softmax probability to show word
 
 # ==============================
 # Load Model
