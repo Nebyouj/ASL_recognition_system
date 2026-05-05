@@ -399,7 +399,7 @@ NORMALIZE_LANDMARKS = True
 with open("labels.json", "r") as f:
     data = json.load(f)
 
-GESTURES = data["letters"] + data["words"]
+GESTURES = data["words"]
 
 # ==============================
 # MediaPipe Initialization

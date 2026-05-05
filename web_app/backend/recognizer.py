@@ -3,14 +3,15 @@ import torch
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from collections import deque
 
 # ==============================
 # CONFIGURATION
 # ==============================
-SEQUENCE_LENGTH = 5
-PAUSE_FRAMES = 4
-MOTION_THRESHOLD = 0.01
-CONFIDENCE_THRESHOLD = 0.6
+SEQUENCE_LENGTH = 30
+PAUSE_FRAMES = 15
+MOTION_THRESHOLD = 0.005
+CONFIDENCE_THRESHOLD = 0.5
 
 
 
@@ -19,7 +20,8 @@ class ASLRecognizer:
         self.model = model
         self.labels = labels
 
-        self.sequence = []
+
+        self.sequence = deque(maxlen=SEQUENCE_LENGTH)
         self.sentence = []
 
         self.prev_features = None
@@ -49,14 +51,15 @@ class ASLRecognizer:
     # ==============================
     def extract_features(self, result):
         features = []
-
         for i in range(2):
             if i < len(result.hand_landmarks):
-                for p in result.hand_landmarks[i]:
-                    features.extend([p.x, p.y])
+                lm = result.hand_landmarks[i]
+                wrist_x, wrist_y = lm[0].x, lm[0].y  # ✅ wrist origin
+                for p in lm:
+                    features.append(p.x - wrist_x)
+                    features.append(p.y - wrist_y)
             else:
                 features.extend([0.0] * 42)
-
         return features
 
     # ==============================
@@ -75,9 +78,10 @@ class ASLRecognizer:
     
     def run_prediction(self):
         x = torch.tensor(
-            np.array(self.sequence[:SEQUENCE_LENGTH]),
-            dtype=torch.float32
+        np.array(list(self.sequence)),
+        dtype=torch.float32
         ).unsqueeze(0)
+
 
         with torch.no_grad():
             outputs = self.model(x)
@@ -91,7 +95,7 @@ class ASLRecognizer:
 
         print(f"Prediction: {word} | Confidence: {confidence:.3f}")
 
-        if confidence >= 0.6:
+        if confidence >= 0.3:
             if word != self.last_word:
                 self.sentence.append(word)
                 self.last_word = word
@@ -170,7 +174,7 @@ class ASLRecognizer:
             print("🟡 Pause detected — running prediction...")
 
             x = torch.tensor(
-                np.array(self.sequence[:SEQUENCE_LENGTH]),
+                np.array(list(self.sequence)),
                 dtype=torch.float32
             ).unsqueeze(0)
 

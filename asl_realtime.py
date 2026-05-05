@@ -161,8 +161,11 @@ def extract_two_hand_features(result):
     features = []
     for i in range(2):
         if i < len(result.hand_landmarks):
-            for p in result.hand_landmarks[i]:
-                features.extend([p.x, p.y])
+            lm = result.hand_landmarks[i]
+            wrist_x, wrist_y = lm[0].x, lm[0].y  # ✅ wrist origin
+            for p in lm:
+                features.append(p.x - wrist_x)
+                features.append(p.y - wrist_y)
         else:
             features.extend([0.0] * 42)
     return features

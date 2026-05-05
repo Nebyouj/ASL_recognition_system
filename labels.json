@@ -1,5 +1,16 @@
 {
     "letters": ["A","B","C","D","E","F","G","H","I","J","K","L","M",
                  "N","O","P","Q","R","S","T","U","V","W","X","Y","Z","SPACE"],
-    "words": ["HELLO","THANK_YOU","YES","NO","SORRY","PLEASE","GOOD_MORNING","HELP"]
+    "words": [
+        "HELLO","HI","GOODBYE","PLEASE","THANK YOU",
+        "SORRY","EXCUSE ME","WELCOME","NICE","FRIEND",
+        "EAT","DRINK","SLEEP","WORK","STUDY",
+        "HELP","STOP","GO","COME","LOOK",
+        "MOTHER","FATHER","BROTHER","SISTER","CHILD",
+        "HOME","SCHOOL","TOILET","SHOP","BOOK",
+        "PHONE","WATER","FOOD",
+        "WHO","WHAT","WHERE","WHY","HOW","WHEN",
+        "HAPPY","SAD","ANGRY","LOVE","SCARED",
+        "TIRED","EXCITED","SICK","BORED","SURPRISED"
+    ]
 }
