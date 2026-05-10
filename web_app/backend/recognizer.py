@@ -8,7 +8,7 @@ from collections import deque
 # ==============================
 # CONFIGURATION
 # ==============================
-SEQUENCE_LENGTH = 30
+SEQUENCE_LENGTH = 20
 PAUSE_FRAMES = 15
 MOTION_THRESHOLD = 0.005
 CONFIDENCE_THRESHOLD = 0.5

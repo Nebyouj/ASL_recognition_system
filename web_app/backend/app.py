@@ -144,33 +144,26 @@ async def predict(frame: UploadFile = File(...), lang: str = "en"):
         "sentence": " ".join(recognizer.sentence),
         "translated": translated_sentence
 }
+
 @app.get("/reverse_landmarks")
 def reverse_landmarks(sentence: str):
     words = sentence.upper().split()
     sequences = []
-
     for word in words:
-        folder = os.path.join(BASE_DIR, "asl_dataset", word)
-
-        if not os.path.isdir(folder):
-            logger.warning(f"No folder for word: {word}")
-            continue
-
-        files = sorted(os.listdir(folder))
-        if not files:
-            logger.warning(f"Empty folder for word: {word}")
-            continue
-
-        path = os.path.join(folder, files[0])  # ✅ first available sample
-        try:
+        print("Pose")
+        path = os.path.join(BASE_DIR, "reverse_dataset", f"{word}.npy")
+        if os.path.exists(path):
             seq = np.load(path).tolist()
-            sequences.append(seq)
-            logger.info(f"Loaded {word} | Frames: {len(seq)}")
-        except Exception as e:
-            logger.error(f"Failed to load {word}: {e}")
-
+            sequences.append({"word": word, "frames": seq, "type": "pose+hands"})
+        else:
+            # fallback to old hand-only dataset
+            folder = os.path.join(BASE_DIR, "asl_dataset", word)
+            if os.path.isdir(folder):
+                files = sorted(os.listdir(folder))
+                if files:
+                    seq = np.load(os.path.join(folder, files[0])).tolist()
+                    sequences.append({"word": word, "frames": seq, "type": "hands-only"})
     return {"sequences": sequences}
-
 
 @app.get("/tts")
 def tts(sentence: str):

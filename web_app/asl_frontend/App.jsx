@@ -19,59 +19,45 @@ const LANGUAGES = [
   { code: "fr", label: "French" },
   { code: "ar", label: "Arabic" },
   { code: "de", label: "German" },
+  {code: "am", label: "አማርኛ (Amharic)"}
 ];
 
-// ─── Upper body only ──────────────────────────────────────────────────────────
-function drawBody(ctx, w, h) {
-  const cx       = w / 2;
-  const headY    = h * 0.12;
-  const shoulderY = h * 0.30;
-  const waistY   = h * 0.62;
-  const shoulderW = w * 0.20;
+// ─── Drawing helpers ──────────────────────────────────────────────────────────
 
-  ctx.strokeStyle = "rgba(160,200,255,0.30)";
-  ctx.lineWidth = 3;
+const POSE_CONNECTIONS = [
+  [0, 1], // left shoulder → right shoulder
+  [0, 2], // left shoulder → left elbow
+  [2, 4], // left elbow   → left wrist
+  [1, 3], // right shoulder → right elbow
+  [3, 5], // right elbow  → right wrist
+];
+
+function drawLine(ctx, p1, p2, color) {
+  if (!p1 || !p2) return;
+  if (p1.v < 0.3 || p2.v < 0.3) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
   ctx.lineCap = "round";
-
-  // Head
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
   ctx.beginPath();
-  ctx.arc(cx, headY, w * 0.06, 0, Math.PI * 2);
+  ctx.moveTo(p1.sx, p1.sy);
+  ctx.lineTo(p2.sx, p2.sy);
   ctx.stroke();
+  ctx.restore();
+}
 
-  // Neck → shoulder line
+function drawJoint(ctx, p, color, r = 5) {
+  if (!p || p.v < 0.3) return;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.moveTo(cx, headY + w * 0.06);
-  ctx.lineTo(cx, shoulderY);
-  ctx.stroke();
-
-  // Shoulders
-  ctx.beginPath();
-  ctx.moveTo(cx - shoulderW, shoulderY);
-  ctx.lineTo(cx + shoulderW, shoulderY);
-  ctx.stroke();
-
-  // Torso to waist
-  ctx.beginPath();
-  ctx.moveTo(cx, shoulderY);
-  ctx.lineTo(cx, waistY);
-  ctx.stroke();
-
-  // Upper arms (forearms replaced by animated hands)
-  ctx.beginPath();
-  ctx.moveTo(cx - shoulderW, shoulderY);
-  ctx.lineTo(cx - shoulderW * 1.6, shoulderY + h * 0.18);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(cx + shoulderW, shoulderY);
-  ctx.lineTo(cx + shoulderW * 1.6, shoulderY + h * 0.18);
-  ctx.stroke();
-
-  // Waist line
-  ctx.beginPath();
-  ctx.moveTo(cx - shoulderW * 0.7, waistY);
-  ctx.lineTo(cx + shoulderW * 0.7, waistY);
-  ctx.stroke();
+  ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawSkeleton(ctx, points, color) {
@@ -100,7 +86,71 @@ function drawSkeleton(ctx, points, color) {
   ctx.restore();
 }
 
-// Hands placed at waist level, offset left/right
+// Static fallback body — used for old hand-only format
+function drawBody(ctx, w, h) {
+  const cx       = w / 2;
+  const headY    = h * 0.12;
+  const shoulderY = h * 0.30;
+  const waistY   = h * 0.62;
+  const shoulderW = w * 0.20;
+
+  ctx.strokeStyle = "rgba(160,200,255,0.30)";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  ctx.arc(cx, headY, w * 0.06, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, headY + w * 0.06);
+  ctx.lineTo(cx, shoulderY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - shoulderW, shoulderY);
+  ctx.lineTo(cx + shoulderW, shoulderY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, shoulderY);
+  ctx.lineTo(cx, waistY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - shoulderW, shoulderY);
+  ctx.lineTo(cx - shoulderW * 1.6, shoulderY + h * 0.18);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx + shoulderW, shoulderY);
+  ctx.lineTo(cx + shoulderW * 1.6, shoulderY + h * 0.18);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - shoulderW * 0.7, waistY);
+  ctx.lineTo(cx + shoulderW * 0.7, waistY);
+  ctx.stroke();
+}
+
+// Scale hand points anchored at a specific wrist screen position
+function scaleHandToAnchor(rawPoints, anchorSX, anchorSY, canvasW, canvasH) {
+  const xs = rawPoints.map(p => p.x);
+  const ys = rawPoints.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const bw = maxX - minX, bh = maxY - minY;
+  if (bw === 0 || bh === 0) return rawPoints.map(() => ({ x: anchorSX, y: anchorSY }));
+
+  const scale = Math.min(canvasW * 0.20 / bw, canvasH * 0.28 / bh);
+
+  return rawPoints.map(p => ({
+    x: (p.x - minX - bw / 2) * scale + anchorSX,
+    y: (p.y - minY - bh / 2) * scale + anchorSY,
+  }));
+}
+
+// Scale hand points for old hand-only fallback (fixed canvas offsets)
 function scaleHandPoints(rawPoints, canvasW, canvasH, offsetX = 0) {
   const xs = rawPoints.map(p => p.x);
   const ys = rawPoints.map(p => p.y);
@@ -111,7 +161,7 @@ function scaleHandPoints(rawPoints, canvasW, canvasH, offsetX = 0) {
 
   const scale = Math.min(canvasW * 0.25 / bw, canvasH * 0.30 / bh);
   const targetX = canvasW / 2 + offsetX;
-  const targetY = canvasH * 0.58; // waist level — where upper arms end
+  const targetY = canvasH * 0.58;
 
   return rawPoints.map(p => ({
     x: (p.x - minX - bw / 2) * scale + targetX,
@@ -129,16 +179,281 @@ function parseHand(flat42) {
 function interpolate(a, b, t) {
   return a.map((v, i) => v + (b[i] - v) * t);
 }
+// ── Face drawing ──────────────────────────────────────────────────────────────
+// face landmark indices in our saved array:
+// 0=nose, 1=leftEyeInner, 2=leftEye, 3=leftEyeOuter
+// 4=rightEyeInner, 5=rightEye, 6=rightEyeOuter
+// 7=leftEar, 8=rightEar, 9=leftMouth, 10=rightMouth
 
+function drawFace(ctx, faceJoints, canvasW) {
+  const [
+    nose,
+    leftEyeInner, leftEye, leftEyeOuter,
+    rightEyeInner, rightEye, rightEyeOuter,
+    leftEar, rightEar,
+    leftMouth, rightMouth,
+  ] = faceJoints;
+
+  // Skip if key points aren't visible
+  if (!leftEar || !rightEar || leftEar.z > 0.1 || rightEar.z > 0.1) return;
+
+  ctx.save();
+
+  // ── Face outline — half-oval shape ────────────────────────────────────────
+  // Use ears + nose to define the oval proportions
+  const faceWidth  = Math.abs(rightEar.sx - leftEar.sx);
+  const faceHeight = faceWidth * 1.35; // slightly taller than wide
+  const faceCX     = (leftEar.sx + rightEar.sx) / 2;
+  // Center the oval so ears touch the sides and nose is roughly in middle
+  const faceCY     = nose.sy - faceHeight * 0.1;
+
+  // Outer glow
+  ctx.shadowColor = "rgba(160,200,255,0.4)";
+  ctx.shadowBlur  = 16;
+  ctx.strokeStyle = "rgba(160,200,255,0.55)";
+  ctx.lineWidth   = 2;
+
+  // Draw half-oval face: full ellipse but slightly flattened on top
+  ctx.beginPath();
+  ctx.ellipse(
+    faceCX, faceCY,
+    faceWidth  * 0.52,  // x-radius — slightly inside the ears
+    faceHeight * 0.50,  // y-radius
+    0, 0, Math.PI * 2
+  );
+  ctx.stroke();
+
+  // ── Eyes ─────────────────────────────────────────────────────────────────
+  const eyeRadius = faceWidth * 0.07;
+
+  // Left eye (from viewer's perspective = signer's right)
+  if (leftEye) {
+    ctx.shadowColor = "#63b3ed";
+    ctx.shadowBlur  = 8;
+    ctx.strokeStyle = "#63b3ed";
+    ctx.lineWidth   = 1.5;
+
+    // Eye outline as a small ellipse
+    ctx.beginPath();
+    ctx.ellipse(leftEye.sx, leftEye.sy, eyeRadius * 1.4, eyeRadius * 0.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Iris dot
+    ctx.fillStyle = "#63b3ed";
+    ctx.beginPath();
+    ctx.arc(leftEye.sx, leftEye.sy, eyeRadius * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Right eye
+  if (rightEye) {
+    ctx.shadowColor = "#63b3ed";
+    ctx.shadowBlur  = 8;
+    ctx.strokeStyle = "#63b3ed";
+    ctx.lineWidth   = 1.5;
+
+    ctx.beginPath();
+    ctx.ellipse(rightEye.sx, rightEye.sy, eyeRadius * 1.4, eyeRadius * 0.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#63b3ed";
+    ctx.beginPath();
+    ctx.arc(rightEye.sx, rightEye.sy, eyeRadius * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Nose bridge ───────────────────────────────────────────────────────────
+  if (nose && leftEye && rightEye) {
+    const noseBridgeY = (leftEye.sy + rightEye.sy) / 2 + eyeRadius;
+    const noseTipX    = nose.sx;
+    const noseTipY    = nose.sy;
+    const noseW       = faceWidth * 0.10;
+
+    ctx.shadowColor = "rgba(160,200,255,0.3)";
+    ctx.shadowBlur  = 4;
+    ctx.strokeStyle = "rgba(160,200,255,0.40)";
+    ctx.lineWidth   = 1.5;
+
+    // Bridge line
+    ctx.beginPath();
+    ctx.moveTo(noseTipX, noseBridgeY);
+    ctx.lineTo(noseTipX, noseTipY - eyeRadius);
+    ctx.stroke();
+
+    // Nose base arc
+    ctx.beginPath();
+    ctx.arc(noseTipX, noseTipY, noseW, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  }
+
+  // ── Mouth ─────────────────────────────────────────────────────────────────
+  if (leftMouth && rightMouth) {
+    const mouthW  = Math.abs(rightMouth.sx - leftMouth.sx);
+    const mouthCX = (leftMouth.sx + rightMouth.sx) / 2;
+    const mouthCY = (leftMouth.sy + rightMouth.sy) / 2;
+
+    ctx.shadowColor = "rgba(160,200,255,0.3)";
+    ctx.shadowBlur  = 6;
+    ctx.strokeStyle = "rgba(160,200,255,0.55)";
+    ctx.lineWidth   = 1.5;
+
+    // Mouth as a subtle arc (slight smile curve)
+    ctx.beginPath();
+    ctx.moveTo(leftMouth.sx, leftMouth.sy);
+    ctx.quadraticCurveTo(
+      mouthCX, mouthCY + mouthW * 0.25,  // control point — curves down slightly
+      rightMouth.sx, rightMouth.sy
+    );
+    ctx.stroke();
+  }
+
+  // ── Eyebrows (estimated above eyes) ──────────────────────────────────────
+  if (leftEyeOuter && leftEyeInner) {
+    const browY = leftEye ? leftEye.sy - eyeRadius * 1.8 : leftEyeOuter.sy - eyeRadius * 2;
+    ctx.shadowColor = "rgba(160,200,255,0.2)";
+    ctx.strokeStyle = "rgba(160,200,255,0.35)";
+    ctx.lineWidth   = 1.5;
+    ctx.lineCap     = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(leftEyeOuter.sx, browY + eyeRadius * 0.3);
+    ctx.quadraticCurveTo(
+      (leftEyeOuter.sx + leftEyeInner.sx) / 2, browY - eyeRadius * 0.2,
+      leftEyeInner.sx, browY + eyeRadius * 0.2
+    );
+    ctx.stroke();
+  }
+
+  if (rightEyeOuter && rightEyeInner) {
+    const browY = rightEye ? rightEye.sy - eyeRadius * 1.8 : rightEyeOuter.sy - eyeRadius * 2;
+    ctx.strokeStyle = "rgba(160,200,255,0.35)";
+    ctx.lineWidth   = 1.5;
+
+    ctx.beginPath();
+    ctx.moveTo(rightEyeInner.sx, browY + eyeRadius * 0.2);
+    ctx.quadraticCurveTo(
+      (rightEyeInner.sx + rightEyeOuter.sx) / 2, browY - eyeRadius * 0.2,
+      rightEyeOuter.sx, browY + eyeRadius * 0.3
+    );
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ── Updated drawPoseAndHands — 135 feature version ───────────────────────────
+function drawPoseAndHands(ctx, frame, canvasW, canvasH) {
+  // [0–32]  face: 11 landmarks × (x, y, z)
+  // [33–50] body: 6 joints   × (x, y, visibility)
+  // [51–92] left hand: 42 values (wrist-normalized x,y)
+  // [93–134] right hand: 42 values
+
+  // ── Parse face joints ─────────────────────────────────────────────────────
+  const faceJoints = [];
+  for (let i = 0; i < 33; i += 3) {
+    const x = frame[i], y = frame[i + 1], z = frame[i + 2];
+    faceJoints.push({
+      x, y, z,
+      sx: x * canvasW,
+      sy: y * canvasH,
+    });
+  }
+
+  // ── Parse body joints ─────────────────────────────────────────────────────
+  const bodyJoints = [];
+  for (let i = 33; i < 51; i += 3) {
+    bodyJoints.push({
+      x:  frame[i],
+      y:  frame[i + 1],
+      v:  frame[i + 2],
+      sx: frame[i]     * canvasW,
+      sy: frame[i + 1] * canvasH,
+    });
+  }
+  const [ls, rs, le, re, lw, rw] = bodyJoints;
+
+  // ── Draw face ─────────────────────────────────────────────────────────────
+  drawFace(ctx, faceJoints, canvasW);
+
+  // ── Draw torso (estimated from shoulders) ─────────────────────────────────
+  if (ls.v > 0.3 && rs.v > 0.3) {
+    const midX        = (ls.sx + rs.sx) / 2;
+    const midY        = (ls.sy + rs.sy) / 2;
+    const shoulderSpan = Math.abs(rs.sx - ls.sx);
+    const waistY      = midY + shoulderSpan * 1.0;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(160,200,255,0.35)";
+    ctx.lineWidth   = 3;
+    ctx.lineCap     = "round";
+    ctx.shadowColor = "rgba(99,179,237,0.2)";
+    ctx.shadowBlur  = 6;
+
+    // Neck — from midpoint of shoulders upward
+    const [nose] = faceJoints;
+    if (nose) {
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(nose.sx, nose.sy + (midY - nose.sy) * 0.6);
+      ctx.stroke();
+    }
+
+    // Torso
+    ctx.beginPath();
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(midX, waistY);
+    ctx.stroke();
+
+    // Waist line
+    ctx.beginPath();
+    ctx.moveTo(midX - shoulderSpan * 0.35, waistY);
+    ctx.lineTo(midX + shoulderSpan * 0.35, waistY);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ── Arm bones ─────────────────────────────────────────────────────────────
+  drawLine(ctx, ls, rs, "rgba(160,200,255,0.45)");
+  drawLine(ctx, ls, le, "#63b3ed");
+  drawLine(ctx, le, lw, "#63b3ed");
+  drawLine(ctx, rs, re, "#f6ad55");
+  drawLine(ctx, re, rw, "#f6ad55");
+
+  [ls, le, lw].forEach(j => drawJoint(ctx, j, "#63b3ed", 6));
+  [rs, re, rw].forEach(j => drawJoint(ctx, j, "#f6ad55", 6));
+
+  // ── Hands anchored at wrist positions ────────────────────────────────────
+  const leftRaw  = parseHand(frame.slice(51, 93));
+  const rightRaw = parseHand(frame.slice(93, 135));
+
+  if (lw.v > 0.3 && leftRaw.some(p => p.x !== 0 || p.y !== 0)) {
+    const scaled = scaleHandToAnchor(leftRaw, lw.sx, lw.sy, canvasW, canvasH);
+    drawSkeleton(ctx, scaled, "#63b3ed");
+  }
+
+  if (rw.v > 0.3 && rightRaw.some(p => p.x !== 0 || p.y !== 0)) {
+    const scaled = scaleHandToAnchor(rightRaw, rw.sx, rw.sy, canvasW, canvasH);
+    drawSkeleton(ctx, scaled, "#f6ad55");
+  }
+}
+
+// ── Frame builder — handles both new and old backend formats ─────────────────
+// new format: sequences = [{ word, frames: [...], type: "pose+hands" }, ...]
+// old format: sequences = [[...], [...]]  (raw arrays)
 function buildAllFrames(sequences) {
   const all = [];
-  for (const seq of sequences) {
-    for (let i = 0; i < seq.length - 1; i++) {
-      all.push(seq[i]);
-      all.push(interpolate(seq[i], seq[i + 1], 0.33));
-      all.push(interpolate(seq[i], seq[i + 1], 0.66));
+  for (const item of sequences) {
+    const frames = Array.isArray(item) ? item : item.frames;
+    const type   = Array.isArray(item) ? "hands-only" : (item.type || "hands-only");
+
+    for (let i = 0; i < frames.length - 1; i++) {
+      all.push({ frame: frames[i], type });
+      all.push({ frame: interpolate(frames[i], frames[i + 1], 0.33), type });
+      all.push({ frame: interpolate(frames[i], frames[i + 1], 0.66), type });
     }
-    if (seq.length > 0) all.push(seq[seq.length - 1]);
+    if (frames.length > 0)
+      all.push({ frame: frames[frames.length - 1], type });
   }
   return all;
 }
@@ -179,6 +494,21 @@ function WordChip({ word, index }) {
   );
 }
 
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontWeight: 600,
+      fontSize: 15,
+      letterSpacing: "0.04em",
+      color: "#94a3b8",
+      paddingBottom: 4,
+      borderBottom: "1px solid rgba(99,179,237,0.1)",
+    }}>
+      {children}
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const videoRef      = useRef(null);
@@ -186,8 +516,8 @@ export default function App() {
   const wsRef         = useRef(null);
   const frameTimerRef = useRef(null);
   const animFrameRef  = useRef(null);
-  const lastWordRef   = useRef("");        // ref so WS closure always sees latest
-  const outputLangRef = useRef("en");     // ref so WS closure always sees latest lang
+  const lastWordRef   = useRef("");
+  const outputLangRef = useRef("en");
 
   const [connected,    setConnected]    = useState(false);
   const [sentence,     setSentence]     = useState([]);
@@ -200,10 +530,10 @@ export default function App() {
   const [reverseStatus, setReverseStatus] = useState("");
   const [isAnimating,   setIsAnimating]   = useState(false);
 
-  // Keep ref in sync with state so the WS closure doesn't go stale
+  // Keep ref in sync with state so WS closure never goes stale
   useEffect(() => { outputLangRef.current = outputLang; }, [outputLang]);
 
-  // ── Translation ─────────────────────────────────────────────────────────
+  // ── Translation ──────────────────────────────────────────────────────────
   const translateSentence = useCallback(async (text, lang) => {
     if (!text || lang === "en") { setTranslated(""); return; }
     try {
@@ -264,7 +594,6 @@ export default function App() {
           const prevStr = prev.join(" ");
           const newStr  = words.join(" ");
 
-          // Only translate when sentence actually gains a new word
           if (prevStr !== newStr && newStr.length > 0) {
             const lang = outputLangRef.current;
             if (lang !== "en") translateSentence(newStr, lang);
@@ -274,7 +603,6 @@ export default function App() {
           return words;
         });
 
-        // TTS — only speak new words
         if (data.word && data.word !== lastWordRef.current) {
           lastWordRef.current = data.word;
           playTTS(data.word);
@@ -361,6 +689,7 @@ export default function App() {
     }
   };
 
+  // ── Animate frames — dispatches to pose+hands or old hand-only path ──────
   const animateFrames = (frames, onDone) => {
     const canvas = avatarRef.current;
     if (!canvas) return;
@@ -375,7 +704,7 @@ export default function App() {
 
       ctx.clearRect(0, 0, w, h);
 
-      // Subtle grid
+      // Subtle background grid
       ctx.strokeStyle = "rgba(99,179,237,0.05)";
       ctx.lineWidth = 1;
       for (let gx = 0; gx < w; gx += 40) {
@@ -385,17 +714,22 @@ export default function App() {
         ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
       }
 
-      drawBody(ctx, w, h);
+      const { frame, type } = frames[i];
 
-      const frame = frames[i];
-      const leftRaw  = parseHand(frame.slice(0, 42));
-      const rightRaw = parseHand(frame.slice(42));
+      if (type === "pose+hands") {
+        // New format: 102 values — pose-driven body + anchored hands
+        drawPoseAndHands(ctx, frame, w, h);
+      } else {
+        // Old format: 84 values — static body + scaled hands
+        drawBody(ctx, w, h);
+        const leftRaw  = parseHand(frame.slice(0, 42));
+        const rightRaw = parseHand(frame.slice(42));
 
-      if (leftRaw.some(p => p.x !== 0 || p.y !== 0))
-        drawSkeleton(ctx, scaleHandPoints(leftRaw,  w, h, -w * 0.18), "#63b3ed");
-
-      if (rightRaw.some(p => p.x !== 0 || p.y !== 0))
-        drawSkeleton(ctx, scaleHandPoints(rightRaw, w, h, +w * 0.18), "#f6ad55");
+        if (leftRaw.some(p => p.x !== 0 || p.y !== 0))
+          drawSkeleton(ctx, scaleHandPoints(leftRaw,  w, h, -w * 0.18), "#63b3ed");
+        if (rightRaw.some(p => p.x !== 0 || p.y !== 0))
+          drawSkeleton(ctx, scaleHandPoints(rightRaw, w, h, +w * 0.18), "#f6ad55");
+      }
 
       i++;
       animFrameRef.current = requestAnimationFrame(draw);
@@ -455,13 +789,16 @@ export default function App() {
           }}>
             ASL Bidirectional Communication
           </h1>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8, opacity: 0.7, fontSize: 13 }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 6, marginTop: 8, opacity: 0.7, fontSize: 13,
+          }}>
             <StatusDot connected={connected} />
             {connected ? "WebSocket connected — real-time" : "Reconnecting..."}
           </div>
         </div>
 
-        {/* ── Grid ── */}
+        {/* ── Main grid ── */}
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))",
@@ -514,7 +851,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Only show translation box when language is non-English AND there's a sentence */}
             {outputLang !== "en" && sentence.length > 0 && (
               <div style={boxStyle}>
                 <div style={labelStyle}>
@@ -682,18 +1018,3 @@ const btnStyle = (color, disabled = false) => ({
   transition: "all 0.2s",
   letterSpacing: "0.02em",
 });
-
-function SectionLabel({ children }) {
-  return (
-    <div style={{
-      fontWeight: 600,
-      fontSize: 15,
-      letterSpacing: "0.04em",
-      color: "#94a3b8",
-      paddingBottom: 4,
-      borderBottom: "1px solid rgba(99,179,237,0.1)",
-    }}>
-      {children}
-    </div>
-  );
-}
