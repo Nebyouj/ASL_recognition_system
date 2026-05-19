@@ -51,7 +51,7 @@ import base64
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("✅ WebSocket connected")
+    print("WebSocket connected")
     
     # Each WebSocket connection gets its OWN recognizer — solves the singleton problem
     ws_recognizer = ASLRecognizer(model, labels)
@@ -82,7 +82,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(response)
             
     except WebSocketDisconnect:
-        print("❌ WebSocket disconnected")
+        print("WebSocket disconnected")
 
 @app.post("/clear")
 def clear_sentence():
@@ -120,8 +120,14 @@ def translate_text(body: dict):
 
 @app.get("/", response_class=HTMLResponse)
 def serve_home():
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return """
+    <html>
+        <body>
+            <h2>ASL backend is running</h2>
+            <p>Start the frontend separately from <code>web_app/asl_frontend</code>.</p>
+        </body>
+    </html>
+    """
     
 @app.post("/predict")
 async def predict(frame: UploadFile = File(...), lang: str = "en"):

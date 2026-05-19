@@ -9,7 +9,7 @@ from collections import deque
 # CONFIGURATION
 # ==============================
 SEQUENCE_LENGTH = 20
-PAUSE_FRAMES = 15
+PAUSE_FRAMES = 10
 MOTION_THRESHOLD = 0.005
 CONFIDENCE_THRESHOLD = 0.5
 
@@ -44,7 +44,7 @@ class ASLRecognizer:
 
         self.detector = vision.HandLandmarker.create_from_options(options)
 
-        print("✅ ASL Recognizer Initialized")
+        print("ASL Recognizer Initialized")
 
     # ==============================
     # Feature Extraction
@@ -54,7 +54,7 @@ class ASLRecognizer:
         for i in range(2):
             if i < len(result.hand_landmarks):
                 lm = result.hand_landmarks[i]
-                wrist_x, wrist_y = lm[0].x, lm[0].y  # ✅ wrist origin
+                wrist_x, wrist_y = lm[0].x, lm[0].y  # wrist origin
                 for p in lm:
                     features.append(p.x - wrist_x)
                     features.append(p.y - wrist_y)
@@ -99,7 +99,7 @@ class ASLRecognizer:
             if word != self.last_word:
                 self.sentence.append(word)
                 self.last_word = word
-                print(f"✅ WORD ADDED: {word}")
+                print(f"WORD ADDED: {word}")
 
         self.sequence.clear()
         self.still_frames = 0
@@ -112,7 +112,7 @@ class ASLRecognizer:
     # ==============================
     def process_frame(self, frame):
 
-        # Convert BGR → RGB
+        # Convert BGR to RGB
         rgb = frame[:, :, ::-1]
 
         mp_image = mp.Image(
@@ -120,7 +120,7 @@ class ASLRecognizer:
             data=rgb
         )
 
-        # 🔥 Proper timestamp increment (30 FPS approx)
+        # Proper timestamp increment (30 FPS approx)
         self.frame_timestamp += 33
 
         result = self.detector.detect_for_video(
@@ -129,7 +129,7 @@ class ASLRecognizer:
         )
 
         if not result.hand_landmarks:
-            print("❌ No hands detected")
+            print("No hands detected")
 
             # # Treat no hands as pause
             # self.still_frames += 1
@@ -171,7 +171,7 @@ class ASLRecognizer:
             len(self.sequence) >= SEQUENCE_LENGTH
         ):
 
-            print("🟡 Pause detected — running prediction...")
+            print("Pause detected - running prediction...")
 
             x = torch.tensor(
                 np.array(list(self.sequence)),
@@ -198,11 +198,11 @@ class ASLRecognizer:
                     self.sentence.append(word)
                     self.last_word = word
 
-                    print(f"✅ WORD ADDED: {word}")
+                    print(f"WORD ADDED: {word}")
                 else:
-                    print("⚠️ Same word ignored (duplicate)")
+                    print("Same word ignored (duplicate)")
             else:
-                print("⚠️ Low confidence — ignored")
+                print("Low confidence - ignored")
 
             # Reset buffers
             self.sequence.clear()

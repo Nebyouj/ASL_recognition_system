@@ -1,84 +1,5 @@
-# import os
-# import numpy as np
-# import torch
-# import torch.nn as nn
-# from torch.utils.data import Dataset, DataLoader
-
-# # ==============================
-# # Dataset
-# # ==============================
-# class ASLDataset(Dataset):
-#     def __init__(self, root):
-#         self.samples = []
-#         self.labels = sorted(os.listdir(root))
-#         self.label_map = {l:i for i,l in enumerate(self.labels)}
-
-#         for label in self.labels:
-#             for file in os.listdir(os.path.join(root, label)):
-#                 self.samples.append(
-#                     (os.path.join(root, label, file), self.label_map[label])
-#                 )
-
-#     def __len__(self):
-#         return len(self.samples)
-
-#     def __getitem__(self, idx):
-#         path, label = self.samples[idx]
-#         x = np.load(path)
-#         return torch.tensor(x, dtype=torch.float32), label
-
-# # ==============================
-# # Model
-# # ==============================
-# class ASLBiLSTM(nn.Module):
-#     def __init__(self, input_size=84, hidden_size=128, num_classes=4):
-#         super().__init__()
-#         self.lstm = nn.LSTM(
-#             input_size, hidden_size,
-#             batch_first=True,
-#             bidirectional=True
-#         )
-#         self.dropout = nn.Dropout(0.3)
-#         self.fc = nn.Linear(hidden_size * 2, num_classes)
-
-#     def forward(self, x):
-#         out, _ = self.lstm(x)
-#         out = out[:, -1, :]
-#         out = self.dropout(out)
-#         return self.fc(out)
-
-# # ==============================
-# # Training
-# # ==============================
-# dataset = ASLDataset("asl_dataset")
-# loader = DataLoader(dataset, batch_size=16, shuffle=True)
-
-# model = ASLBiLSTM(num_classes=len(dataset.labels))
-# criterion = nn.CrossEntropyLoss()
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-# for epoch in range(30):
-#     total_loss = 0
-#     for x, y in loader:
-#         optimizer.zero_grad()
-#         loss = criterion(model(x), y)
-#         loss.backward()
-#         optimizer.step()
-#         total_loss += loss.item()
-
-#     print(f"Epoch {epoch+1} | Loss: {total_loss/len(loader):.4f}")
-
-# torch.save({
-#     "model": model.state_dict(),
-#     "labels": dataset.labels
-# }, "asl_bilstm.pth")
-
-
-
-
-
-
 import os
+from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
@@ -90,9 +11,11 @@ import seaborn as sns
 
 # ==============================
 # CONFIG
-# ==============================
+# ==============================app
 SEQUENCE_LENGTH = 30
-DATASET_DIR = "asl_dataset"
+BASE_DIR = Path(__file__).resolve().parent
+DATASET_DIR = BASE_DIR / "asl_dataset"
+MODEL_OUTPUT_PATH = BASE_DIR / "asl_bilstm.pth"
 BATCH_SIZE = 16
 EPOCHS = 50
 LR = 0.001
@@ -105,14 +28,25 @@ PRINT_EVERY = 1
 # ==============================
 class ASLDataset(Dataset):
     def __init__(self, root, split="train", test_size=0.2, random_state=42):
+        root = Path(root)
+        if not root.exists():
+            raise FileNotFoundError(
+                f"Dataset directory not found: {root}\n"
+                f"Expected the dataset folder next to this script, at: {DATASET_DIR}"
+            )
+
         self.samples = []
-        self.labels = sorted(os.listdir(root))
+        self.labels = sorted(
+            label_dir.name for label_dir in root.iterdir() if label_dir.is_dir()
+        )
         self.label_map = {l: i for i, l in enumerate(self.labels)}
 
         all_samples = []
         for label in self.labels:
-            for file in os.listdir(os.path.join(root, label)):
-                all_samples.append((os.path.join(root, label, file), self.label_map[label]))
+            label_dir = root / label
+            for sample_path in label_dir.iterdir():
+                if sample_path.is_file():
+                    all_samples.append((sample_path, self.label_map[label]))
 
         train_samples, test_samples = train_test_split(
             all_samples,
@@ -242,7 +176,7 @@ for epoch in range(EPOCHS):
         torch.save({
             "model": model.state_dict(),
             "labels": train_dataset.labels
-        }, "asl_bilstm.pth")
+        }, MODEL_OUTPUT_PATH)
     else:
         patience_counter += 1
         if patience_counter >= PATIENCE:
